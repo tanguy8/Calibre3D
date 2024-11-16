@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calcul du calibrage de l'extrudeur</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Police type ingénierie */
+            background-color: #f4f4f4; /* Gris clair pour un fond neutre */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100vh;
+            color: #333;
+            flex-direction: row;
+        }
+
+        .header {
+            background-color: #2a2a2a; /* Gris foncé industriel */
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .header select {
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #777;
+            background-color: #333;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        .container {
+            background-color: #ffffff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Ombre pour un effet de profondeur */
+            padding: 30px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            margin-top: 20px;
+            margin-right: 20px;
+        }
+
+        h1 {
+            color: #1e88e5; /* Bleu acier pour une touche technique */
+            font-size: 28px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .input-field {
+            margin-bottom: 20px;
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .input-field:focus {
+            border-color: #1e88e5;
+            outline: none;
+        }
+
+        .input-field.error {
+            border-color: #e53935; /* Rouge d'erreur */
+        }
+
+        button {
+            background-color: #1e88e5; /* Bleu acier */
+            color: white;
+            font-size: 18px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #1565c0;
+        }
+
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #388e3c; /* Vert pour le succès */
+        }
+
+        .error {
+            color: #e53935; /* Rouge d'erreur */
+            font-size: 16px;
+        }
+
+        .gcode-container {
+            margin-top: 30px;
+            font-size: 16px;
+            color: #333;
+            padding: 15px;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .gcode-link {
+            text-decoration: none;
+            color: #1e88e5;
+            font-weight: bold;
+        }
+
+        .reset-button {
+            background-color: #e53935;
+            color: white;
+            font-size: 16px;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .reset-button:hover {
+            background-color: #c62828;
+        }
+
+        /* Effet métallique et minimaliste */
+        .metallic-border {
+            border: 2px solid #888;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 8px;
+            background-color: #f0f0f0;
+        }
+
+        .metallic-header {
+            background-color: #777;
+            color: white;
+            padding: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+
+        /* Styles du menu latéral */
+        .sidebar {
+            background-color: #333;
+            color: white;
+            width: 250px;
+            padding: 20px;
+            box-sizing: border-box;
+            height: 100vh;
+            overflow-y: auto;
+            position: fixed;
+            right: 0;
+            top: 0;
+            border-left: 2px solid #1e88e5;
+        }
+
+        .sidebar h2 {
+            color: #1e88e5;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+
+        .sidebar h3 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar ul li {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+    </style>
+    <script>
+        function calculerCalibrage() {
+            var expectedExtrusion = parseFloat(document.getElementById('expected').value);
+            var measuredExtrusion = parseFloat(document.getElementById('measured').value);
+            var valid = true;
+
+            // Réinitialiser les erreurs
+            document.getElementById('expected').classList.remove('error');
+            document.getElementById('measured').classList.remove('error');
+            document.getElementById('resultat').innerHTML = '';
+            document.getElementById('gcode-container').style.display = 'none';
+
+            // Vérifier que les valeurs sont des nombres valides
+            if (isNaN(expectedExtrusion) || expectedExtrusion <= 0) {
+                document.getElementById('expected').classList.add('error');
+                valid = false;
+            }
+            if (isNaN(measuredExtrusion) || measuredExtrusion <= 0) {
+                document.getElementById('measured').classList.add('error');
+                valid = false;
+            }
+
+            if (!valid) {
+                document.getElementById('resultat').innerHTML = '<p class="error">Veuillez entrer des valeurs valides et supérieures à 0.</p>';
+                return;
+            }
+
+            // Calcul du facteur de calibrage
+            var calibrageFactor = expectedExtrusion / measuredExtrusion;
+
+            // Afficher le résultat
+            document.getElementById('resultat').innerHTML = "Le facteur de calibrage est : <strong>" + calibrageFactor.toFixed(4) + "</strong>";
+
+            // Générer et afficher le G-code
+            var gcode = `M92 E${(calibrageFactor * 100).toFixed(0)} ; Ajuste les E-steps pour l'extrudeur\nM500 ; Sauvegarde la configuration dans le firmware`;
+
+            document.getElementById('gcode-container').style.display = 'block';
+            document.getElementById('gcode').textContent = gcode;
+        }
+
+        function resetForm() {
+            document.getElementById('expected').value = '';
+            document.getElementById('measured').value = '';
+            document.getElementById('resultat').innerHTML = '';
+            document.getElementById('gcode-container').style.display = 'none';
+            document.getElementById('expected').classList.remove('error');
+            document.getElementById('measured').classList.remove('error');
+        }
+    </script>
+</head>
+<body>
+
+
+    <!-- Contenu principal -->
+    <div class="container">
+        <h1>Calcul du calibrage de l'extrudeur</h1>
+        <p>Entrez la longueur de filament que vous voulez extruder et la longueur réelle extrudée.</p>
+
+        <input type="number" id="expected" class="input-field" step="0.1" placeholder="Longueur attendue (mm)" required><br>
+
+        <input type="number" id="measured" class="input-field" step="0.1" placeholder="Longueur mesurée (mm)" required><br>
+
+        <button onclick="calculerCalibrage()">Calculer le calibrage</button>
+
+        <div id="resultat" class="result"></div>
+
+        <div id="gcode-container" class="gcode-container" style="display: none;">
+            <h3 class="metallic-header">Commande G-code sélectionnée :</h3>
+            <pre id="gcode"></pre>
+        </div>
+
+        <button class="reset-button" onclick="resetForm()">Réinitialiser</button>
+    </div>
+
+</body>
+</html>
